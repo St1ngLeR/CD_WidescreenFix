@@ -1,5 +1,5 @@
 # CD_WidescreenFix
-An ASI plugin to improve widescreen support for Crashday (2006). This fix automatically corrects the image in the game based on the aspect ratio of your monitor.
+An ASI plugin to improve widescreen support for Crashday (2006). This fix automatically corrects the image in the game based on the aspect ratio of your monitor. Also, as a bonus, this plugin increases the drawing distance. To apply the changes, you need to increase the view range to the maximum in the game graphics settings.
 
 > [!WARNING]
 > This ASI plugin is compatible only with 1.2 game version!
