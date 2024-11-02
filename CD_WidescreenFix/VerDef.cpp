@@ -36,7 +36,10 @@ public:
 				}
 			}
 		}
-		printf("Current game version - %#08x\n", gamever);
+		if (test == true)
+		{
+			printf("Current game version - %#08x\n", gamever);
+		}
 		return gamever;
 	}
 
