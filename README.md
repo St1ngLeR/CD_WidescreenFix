@@ -12,6 +12,6 @@ To make ASI plugin work in the game you need to use [ThirteenAG's Ultimate ASI L
 
 This fix works automatically out of the box, but you can change the settings offered inside the `CDWidescreenFix.ini` file:
 
-- `ForceAspectRatio` - This parameter is overrides game's aspect ratio. You can set your own values with `X:Y` format (i.e. 4:3, 5:4, 16:9)
+- `ForceAspectRatio` - This parameter is overrides game's aspect ratio. For automatic recognition based on the game window size use `auto`. To predefine desired aspect ratios set your own values with `X:Y` format (i.e. 4:3, 5:4, 16:9)
 - `FixHUDMessagesScale` - This parameter is fixes the scaling of texture-based HUD messages (0 - disable, 1 - enable)
 - `FixLightFlaresScale` - This paramater is fixes the scaling of light flares (0 - disable, 1 - enable)
