@@ -4,7 +4,7 @@
 An ASI plugin to improve widescreen support for Crashday (2006).
 
 > [!WARNING]
-> Widescreen Fix versions 2.0.0 and later are made especially for 1.2 version, for 1.0 & 1.1 game version support use [vesrion 1.1.0](https://github.com/St1ngLeR/CD_WidescreenFix/releases/tag/v1.1.0)!
+> Widescreen Fix versions 2.0.0 and later are made especially for 1.2 version, for 1.0 & 1.1 game versions support use [vesrion 1.1.0](https://github.com/St1ngLeR/CD_WidescreenFix/releases/tag/v1.1.0)!
 
 ## Install & usage
 To make ASI plugin work in the game you need to use [ThirteenAG's Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) and put plugin files in to game directory or folders mentioned in ThirteenAG's loader GitHub page.
