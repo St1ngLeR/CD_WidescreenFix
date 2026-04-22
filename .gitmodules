@@ -1,3 +1,6 @@
 [submodule "src/IniReader"]
 	path = src/IniReader
 	url = https://github.com/ThirteenAG/IniReader.git
+[submodule "src/injector"]
+	path = src/injector
+	url = https://github.com/St1ngLeR/injector.git
