@@ -1,3 +1,3 @@
 [submodule "external/inireader"]
-	path = external/inireader
+	path = src/IniReader
 	url = https://github.com/ThirteenAG/IniReader
