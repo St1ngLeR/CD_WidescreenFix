@@ -1,0 +1,14 @@
+# ASI-plugin - Extra Customization
+# ---------------------------------------------------------------------------------
+
+Language: rus	# eng, rus, ger
+LanguageName: Русский	# English, Русский, Deutsch
+Sections: 1
+
+#-------------------------------------------------------------------------------------
+SECTION: WidescreenFix.Main
+Keys: 1
+
+ID   SCREENFORMATAUTO
+DESC
+TEXT Автоматический
