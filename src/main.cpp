@@ -1,6 +1,188 @@
 ﻿#include <Windows.h>
+#include <vector>
+#include <algorithm>
+#include <set>
+#include <string>
+
 #include "injector/injector.hpp"
 #include "iniReader.h"
+
+struct DisplayMode
+{
+    float width;
+    float height;
+    int32_t colorDepth;
+    float refreshRate;
+
+    bool operator<(const DisplayMode& other) const
+	{
+        if (width != other.width) return width < other.width;
+        if (height != other.height) return height < other.height;
+        if (colorDepth != other.colorDepth) return colorDepth < other.colorDepth;
+        return refreshRate < other.refreshRate;
+    }
+};
+
+void GetCurrentRefreshRateDisplayModes()
+{
+    DEVMODE currentMode;
+    ZeroMemory(&currentMode, sizeof(currentMode));
+    currentMode.dmSize = sizeof(currentMode);
+    
+    if (!EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &currentMode))
+	{
+        injector::WriteMemory<int32_t>(0x7CD64C, 0);
+        return;
+    }
+    
+    int currentRefreshRate = currentMode.dmDisplayFrequency;
+    std::set<DisplayMode> modesSet;
+    
+    DEVMODE dm;
+    ZeroMemory(&dm, sizeof(dm));
+    dm.dmSize = sizeof(dm);
+    
+    for (int i = 0; EnumDisplaySettings(NULL, i, &dm); i++)
+	{
+        if (dm.dmDisplayFrequency == currentRefreshRate)
+		{
+            DisplayMode mode;
+            mode.width = static_cast<float>(dm.dmPelsWidth);
+            mode.height = static_cast<float>(dm.dmPelsHeight);
+            mode.colorDepth = dm.dmBitsPerPel;
+            mode.refreshRate = static_cast<float>(dm.dmDisplayFrequency);
+            modesSet.insert(mode);
+        }
+        ZeroMemory(&dm, sizeof(dm));
+        dm.dmSize = sizeof(dm);
+    }
+
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, 
+        L"SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e96e-e325-11ce-bfc1-08002be10318}\\0000\\Modes",
+        0, KEY_READ, &hKey) == ERROR_SUCCESS)
+	{  
+        DWORD index = 0;
+        wchar_t valueName[256];
+        DWORD valueNameSize = sizeof(valueName) / sizeof(wchar_t);
+        BYTE data[256];
+        DWORD dataSize = sizeof(data);
+        
+        while (RegEnumValueW(hKey, index, valueName, &valueNameSize, NULL, NULL, data, &dataSize) == ERROR_SUCCESS)
+		{
+            std::wstring modeStr(valueName);
+            
+            size_t firstX = modeStr.find(L'x');
+            size_t secondX = modeStr.find(L'x', firstX + 1);
+            size_t spacePos = modeStr.find(L' ');
+            
+            if (firstX != std::wstring::npos && secondX != std::wstring::npos && spacePos != std::wstring::npos)
+			{
+                int width = _wtoi(modeStr.substr(0, firstX).c_str());
+                int height = _wtoi(modeStr.substr(firstX + 1, secondX - firstX - 1).c_str());
+                int colorDepth = _wtoi(modeStr.substr(secondX + 1, spacePos - secondX - 1).c_str());
+                int refreshRate = _wtoi(modeStr.substr(spacePos + 1).c_str());
+                
+                if (refreshRate == currentRefreshRate)
+				{
+                    DisplayMode mode;
+                    mode.width = static_cast<float>(width);
+                    mode.height = static_cast<float>(height);
+                    mode.colorDepth = colorDepth;
+                    mode.refreshRate = static_cast<float>(refreshRate);
+                    modesSet.insert(mode);
+                }
+            }
+            
+            index++;
+            valueNameSize = sizeof(valueName) / sizeof(wchar_t);
+            dataSize = sizeof(data);
+        }
+        
+        RegCloseKey(hKey);
+    }
+
+    for (int subKeyIndex = 0; subKeyIndex < 10; subKeyIndex++)
+	{
+        wchar_t subKeyPath[512];
+        swprintf_s(subKeyPath, L"SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e96e-e325-11ce-bfc1-08002be10318}\\%04d\\Modes", subKeyIndex);
+        
+        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, subKeyPath, 0, KEY_READ, &hKey) == ERROR_SUCCESS)
+		{
+            DWORD index = 0;
+            wchar_t valueName[256];
+            DWORD valueNameSize = sizeof(valueName) / sizeof(wchar_t);
+            BYTE data[256];
+            DWORD dataSize = sizeof(data);
+            
+            while (RegEnumValueW(hKey, index, valueName, &valueNameSize, NULL, NULL, data, &dataSize) == ERROR_SUCCESS)
+			{
+                std::wstring modeStr(valueName);
+                
+                size_t firstX = modeStr.find(L'x');
+                size_t secondX = modeStr.find(L'x', firstX + 1);
+                size_t spacePos = modeStr.find(L' ');
+                
+                if (firstX != std::wstring::npos && secondX != std::wstring::npos && spacePos != std::wstring::npos)
+				{
+                    int width = _wtoi(modeStr.substr(0, firstX).c_str());
+                    int height = _wtoi(modeStr.substr(firstX + 1, secondX - firstX - 1).c_str());
+                    int colorDepth = _wtoi(modeStr.substr(secondX + 1, spacePos - secondX - 1).c_str());
+                    int refreshRate = _wtoi(modeStr.substr(spacePos + 1).c_str());
+                    
+                    if (refreshRate == currentRefreshRate)
+					{
+                        DisplayMode mode;
+                        mode.width = static_cast<float>(width);
+                        mode.height = static_cast<float>(height);
+                        mode.colorDepth = colorDepth;
+                        mode.refreshRate = static_cast<float>(refreshRate);
+                        modesSet.insert(mode);
+                    }
+                }
+                
+                index++;
+                valueNameSize = sizeof(valueName) / sizeof(wchar_t);
+                dataSize = sizeof(data);
+            }
+            
+            RegCloseKey(hKey);
+        }
+    }
+
+    std::vector<DisplayMode> modes(modesSet.begin(), modesSet.end());
+
+    uintptr_t address = 0x7CD64C;
+	injector::WriteMemory<int32_t>(address, static_cast<int32_t>(modes.size()));
+    address += sizeof(int32_t);
+
+    for (const auto& mode : modes)
+	{
+		injector::WriteMemory<float>(address, mode.width);
+        address += sizeof(float);
+        
+		injector::WriteMemory<float>(address, mode.height);
+        address += sizeof(float);
+        
+		injector::WriteMemory<int32_t>(address, mode.colorDepth);
+        address += sizeof(int32_t);
+        
+		injector::WriteMemory<int32_t>(address, 0);
+        address += sizeof(int32_t);
+        
+		injector::WriteMemory<float>(address, 1.0f);
+        address += sizeof(float);
+        
+		injector::WriteMemory<float>(address, 1.0f);
+        address += sizeof(float);
+        
+		injector::WriteMemory<float>(address, mode.refreshRate);
+        address += sizeof(float);
+        
+		injector::WriteMemory<int32_t>(address, 0);
+        address += sizeof(int32_t);
+    }
+}
 
 std::string confpath = std::filesystem::current_path().string() + "\\CDWidescreenFix.ini";
 CIniReader patchconf(confpath);
@@ -320,12 +502,48 @@ void __declspec(naked) a_ScreenFormatSet()
 	}
 }
 
+float text_scale_x;
+
+void __declspec(naked) a_TextFix()
+{
+	__asm
+	{
+		mov eax, [eax + 0x84]
+		fmul dword ptr [text_scale_x]
+		
+		jmp loc_5F2261
+
+	loc_5F2261:
+		push 0x5F2261
+		retn
+	}
+}
+
+void __declspec(naked) a_EnumScreenResolutionFix()
+{
+	__asm
+	{
+		call GetCurrentRefreshRateDisplayModes
+		jmp loc_5EA1F6
+
+	loc_5EA1F6:
+		push 0x5EA1F6
+		retn
+	}
+}
+
 DWORD WINAPI MainTHREAD(LPVOID)
 {
 	injector::MakeJMP(0x540D1C, a_ScreenFormatSwitch, true);
 	injector::WriteMemory(0x540D0E, 5, true);
 
 	injector::MakeJMP(0x54151D, a_ScreenFormatSet, true);
+	//injector::MakeJMP(0x5F2258, a_TextFix, true);
+	injector::MakeJMP(0x5EA13D, a_EnumScreenResolutionFix, true);
+
+	injector::WriteMemory<int>(0x5B5FAC, 0x9ED905D9, true);
+	injector::WriteMemory<short>(0x5B5FB0, 0x006D, true);
+	injector::MakeNOP(0x5B5FB2, 3, true);
 
 	while (true)
 	{
@@ -336,51 +554,55 @@ DWORD WINAPI MainTHREAD(LPVOID)
 			injector::MakeNOP(0x492146, 2, true);
 			injector::MakeNOP(0x49214F, 2, true);
 
-			if (ForceAspectRatio == "auto")
+			if (*(DWORD*)0x7DC3F4 == 0)
 			{
-				window_x = injector::ReadMemory<int>(injector::ReadMemory<DWORD>(0x7CF6FC) + 0x250, true);
-				window_y = injector::ReadMemory<int>(injector::ReadMemory<DWORD>(0x7CF6FC) + 0x254, true);
-			}
-			else
-			{
-				ParseAspectRatio(ForceAspectRatio, window_x, window_y);
-			}
-
-			if ((window_x != 0) && (window_y != 0))
-			{
-				AspectWidth = window_x / gcd(window_x, window_y);
-				AspectHeight = window_y / gcd(window_x, window_y);
-
-				scale_general = (AspectWidth / AspectHeight / 1.1875f);
-				scale_2d_x = ((AspectWidth / AspectHeight / 1.333333333333333f / 1.1875f) * 0.00156250002328306f) / (AspectWidth / AspectHeight / 1.777777777777777f);
-				scale_2d_y = (640.0f * 1.1875f / (AspectWidth / AspectHeight / 1.333333333333333f)) * (AspectWidth / AspectHeight / 1.777777777777777f);
-				bgcredits = (0.5f / (AspectWidth / AspectHeight)) * 2.f;
-
-				injector::WriteMemory(0x5FBF01, scale_general, true);
-				injector::WriteMemory(0x6ED584, scale_2d_x, true);
-				injector::WriteMemory(0x6ED58C, scale_2d_y, true);
-				injector::WriteMemory(0x6BABAD, guibackground_scale_y, true);
-				injector::WriteMemory(0x7001D9, bgcredits, true);
-
-				trkpic_x = 110.f * ((float)window_y / (float)window_x);
-				injector::WriteMemory(0x6C485C, trkpic_x, true);
-
-				if (FixHUDMessagesScale)
+				if (ForceAspectRatio == "auto")
 				{
-					msg_x = 0.190476f * ((float)window_y / (float)window_x);
-					msg_y = 0.0416666666666667f * ((float)window_y / (float)window_x);
-
-					injector::WriteMemory(0x6E3D4A, msg_x * HUDMessagesScale, true);
-					injector::WriteMemory(0x6E3D4E, msg_y * HUDMessagesScale, true);
+					window_x = injector::ReadMemory<int>(injector::ReadMemory<DWORD>(0x7CF6FC) + 0x250, true);
+					window_y = injector::ReadMemory<int>(injector::ReadMemory<DWORD>(0x7CF6FC) + 0x254, true);
+				}
+				else
+				{
+					ParseAspectRatio(ForceAspectRatio, window_x, window_y);
 				}
 
-				if (FixLightFlaresScale)
+				if ((window_x != 0) && (window_y != 0))
 				{
-					light1 = 266.66666666f * ((float)window_y / (float)window_x);
-					light2 = 0.88f * ((float)window_y / (float)window_x);
+					AspectWidth = window_x / gcd(window_x, window_y);
+					AspectHeight = window_y / gcd(window_x, window_y);
 
-					injector::WriteMemory(0x6EFF0E, light1 * LightFlaresScale, true);
-					injector::WriteMemory(0x6EFF5A, light2 * LightFlaresScale, true);
+					scale_general = (AspectWidth / AspectHeight / 1.1875f);
+					scale_2d_x = ((AspectWidth / AspectHeight / 1.333333333333333f / 1.1875f) / 480.f / 1.333333333333333f) / (AspectWidth / AspectHeight / 1.777777777777777f);
+					//scale_2d_y = (640.0f * 1.1875f / (AspectWidth / AspectHeight / 1.333333333333333f)) * (AspectWidth / AspectHeight / 1.777777777777777f);
+					bgcredits = (0.5f / (AspectWidth / AspectHeight)) * 2.f;
+					text_scale_x = ((float)window_y / 480.f);
+
+					injector::WriteMemory(0x5FBF01, scale_general, true);
+					injector::WriteMemory(0x6ED584, scale_2d_x, true);
+					injector::WriteMemory(0x6ED58C, 570.f, true);
+					injector::WriteMemory(0x6BABAD, guibackground_scale_y, true);
+					injector::WriteMemory(0x7001D9, bgcredits, true);
+
+					trkpic_x = 110.f * ((float)window_y / (float)window_x);
+					injector::WriteMemory(0x6C485C, trkpic_x, true);
+
+					if (FixHUDMessagesScale)
+					{
+						msg_x = 0.190476f * ((float)window_y / (float)window_x);
+						msg_y = 0.0416666666666667f * ((float)window_y / (float)window_x);
+
+						injector::WriteMemory(0x6E3D4A, msg_x * HUDMessagesScale, true);
+						injector::WriteMemory(0x6E3D4E, msg_y * HUDMessagesScale, true);
+					}
+
+					if (FixLightFlaresScale)
+					{
+						light1 = 266.66666666f * ((float)window_y / (float)window_x);
+						light2 = 0.88f * ((float)window_y / (float)window_x);
+
+						injector::WriteMemory(0x6EFF0E, light1 * LightFlaresScale, true);
+						injector::WriteMemory(0x6EFF5A, light2 * LightFlaresScale, true);
+					}
 				}
 			}
 		}
